@@ -13,7 +13,10 @@ from pydantic import BaseModel
 class Book(BaseModel):
     firstname: str
     lastname: str
+    email :str
     password: str
+    mobile_number=str
+    age = str
 
     class Config:
         orm_mode = True

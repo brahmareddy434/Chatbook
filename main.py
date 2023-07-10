@@ -1,11 +1,12 @@
 from collections import UserString
 import os
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi_sqlalchemy import DBSessionMiddleware
 from pydantic import schema_json_of
 
 from sqlalchemy.orm import Session
+
 
 import models  # Remove the dot (.) before "import models"
 
@@ -29,9 +30,13 @@ def getItems(session: Session = Depends(get_db)):  # Update "get_session" to "ge
     if users :
         return users
     return "Nothing is in db"
-# @app.post("/postsomething/{username}")
-# def postSomething(session: Session , username:str):
-#     new_user = models.User(username=username)
-#     session.add(new_user)
-#     session.commit()
-#     return new_user
+
+
+@app.post("/postsomething")
+def postSomething(data: object, request: Request):
+    # new_user = models.User(username)
+    new_user = 'models.User'
+    Session.add(new_user)
+    Session.commit()
+
+    return new_user

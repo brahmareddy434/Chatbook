@@ -1,42 +1,44 @@
-from collections import UserString
+import uvicorn
+from fastapi import FastAPI
+from fastapi_sqlalchemy import DBSessionMiddleware, db
+
+from schema import Book as SchemaBook
+# from schema import Author as SchemaAuthor
+
+from schema import Book
+# from schema import Author
+
+from models import Book as ModelBook
+# from models import Author as ModelAuthor
+
 import os
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi_sqlalchemy import DBSessionMiddleware
-from pydantic import schema_json_of
 
-from sqlalchemy.orm import Session
-
-
-import models  # Remove the dot (.) before "import models"
-
-from database import SessionLocal, engine
 load_dotenv('.env')
-models.Base.metadata.create_all(bind=engine)
+
+
 app = FastAPI()
-app.add_middleware(DBSessionMiddleware, db_url=os.getenv('DATABASE_URI'))
 
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# to avoid csrftokenError
+app.add_middleware(DBSessionMiddleware, db_url=os.environ['DATABASE_URL'])
 
 @app.get("/")
-def getItems(session: Session = Depends(get_db)):  # Update "get_session" to "get_db"
-    users = session.query(models.User).all()
-    if users :
-        return users
-    return "Nothing is in db"
+async def root():
+    return {"message": "hello world"}
 
 
-@app.post("/postsomething")
-def postSomething(data: object, request: Request):
-    # new_user = models.User(username)
-    new_user = 'models.User'
-    Session.add(new_user)
-    Session.commit()
+@app.post('/create a user /', response_model=SchemaBook)
+async def book(book: SchemaBook):
+    db_book = ModelBook(firstname=book.firstname, lastname=book.lastname,email=book.email, password = book.password,mobile_number=book.mobile_number,age=book.age)
+    db.session.add(db_book)
+    db.session.commit()
+    return db_book
 
-    return new_user
+@app.get('/book/')
+async def book():
+    book = db.session.query(ModelBook).all()
+    return book
+
+
+
+

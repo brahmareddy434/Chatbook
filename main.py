@@ -7,6 +7,9 @@ from schema import Book as SchemaBook
 
 from schema import Book
 # from schema import Author
+from passlib.context import CryptContext
+
+
 
 from models import Book as ModelBook
 # from models import Author as ModelAuthor
@@ -21,6 +24,15 @@ app = FastAPI()
 
 # to avoid csrftokenError
 app.add_middleware(DBSessionMiddleware, db_url=os.environ['DATABASE_URL'])
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def verify_password(plain_password, hashed_password):
+        return pwd_context.verify(plain_password, hashed_password)
+
+
+def get_password_hash(password: str):
+    return pwd_context.hash(password)
+
 
 @app.get("/")
 async def root():
@@ -29,7 +41,8 @@ async def root():
 
 @app.post('/register/', response_model=SchemaBook)
 async def post_book(book: SchemaBook):
-    db_book = ModelBook(firstname=book.firstname, lastname=book.lastname,email=book.email, password = book.password,mobile_number=book.mobile_number,age=book.age)
+    encrypt_pass=get_password_hash(book.password)
+    db_book = ModelBook(firstname=book.firstname, lastname=book.lastname,email=book.email, password = encrypt_pass,mobile_number=book.mobile_number,age=book.age)
     db.session.add(db_book)
     db.session.commit()
     return db_book
@@ -65,6 +78,15 @@ async def delete_user(user_id:int):
         return db_book
     else:
         return"id not found pls provide a correct id"
+    
+@app.get("/login/{password},{id}")
+async def login(password:str,id:int):
+    db_book = db.session.query(ModelBook).get(id)
+    if verify_password(password,db_book.password):
+        return "login successfull welcome mr."+db_book.firstname+" "+db_book.lastname
+    else:
+        return "The password you entered is incorrect"
+
 
 
 

@@ -27,18 +27,44 @@ async def root():
     return {"message": "hello world"}
 
 
-@app.post('/create a user /', response_model=SchemaBook)
-async def book(book: SchemaBook):
+@app.post('/register/', response_model=SchemaBook)
+async def post_book(book: SchemaBook):
     db_book = ModelBook(firstname=book.firstname, lastname=book.lastname,email=book.email, password = book.password,mobile_number=book.mobile_number,age=book.age)
     db.session.add(db_book)
     db.session.commit()
     return db_book
 
-@app.get('/book/')
-async def book():
+@app.get('/fetch_data/')
+async def get_book():
     book = db.session.query(ModelBook).all()
     return book
 
+@app.put('/update_user/{user_id}',response_model=SchemaBook)
+async def update_book(user_id:int, book:SchemaBook):
+    db_book = db.session.query(ModelBook).get(user_id)
+    if db_book:
+        db_book.firstname = book.firstname
+        db_book.lastname = book.lastname
+        db_book.email = book.email
+        db_book.password = book.password
+        db_book.mobile_number = book.mobile_number
+        db_book.age = book.age
+        db.session.commit()
+        return db_book
+    else:
+
+        return "id not found pls provide a correct id"
+    
+@app.delete("/delete_user/{user_id}")
+async def delete_user(user_id:int):
+    db_book = db.session.query(ModelBook).get(user_id)
+
+    if db_book:
+        db.session.delete(db_book)
+        db.session.commit()
+        return db_book
+    else:
+        return"id not found pls provide a correct id"
 
 
 

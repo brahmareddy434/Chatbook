@@ -17,6 +17,7 @@ class Book(BaseModel):
     password: str
     mobile_number:str
     age : str
+    token :str
 
     class Config:
         orm_mode = True

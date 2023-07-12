@@ -39,6 +39,7 @@ class Book(Base):
     password = Column(String)
     mobile_number= Column(String)
     age = Column(Integer)
+    token = Column(String)
     
 
 

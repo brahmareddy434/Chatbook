@@ -75,13 +75,19 @@ async def root():
 
 
 @app.post('/register/', response_model=SchemaBook)
+# changes in register 
 async def post_book(book: SchemaBook):
-    encrypt_pass=get_password_hash(book.password)
-    db_book = ModelBook(firstname=book.firstname, lastname=book.lastname,email=book.email, password = encrypt_pass,mobile_number=book.mobile_number,age=book.age,token=book.token)
-    db.session.add(db_book)
-    db.session.commit()
-    return db_book
-
+    try:
+        encrypt_pass=get_password_hash(book.password)
+        db_book = ModelBook(firstname=book.firstname, lastname=book.lastname,email=book.email, password = encrypt_pass,mobile_number=book.mobile_number,age=book.age,token=book.token)
+        db.session.add(db_book)
+        db.session.commit()
+       
+        return "Registered  Successfully "
+    except Exception as e:
+        
+        return JSONResponse(content="Email Alredy Register Please Provide A New Email ", status_code=400)
+           
 @app.get('/fetch_data/')
 async def get_book():
     book = db.session.query(ModelBook).all()

@@ -10,6 +10,7 @@ from typing import List
 from fastapi.responses import JSONResponse
 import random
 import os,sys
+from auth import signJWT
 
 
 
@@ -20,6 +21,22 @@ from schema import Book as SchemaBook
 from schema import Book
 # from schema import Author
 from passlib.context import CryptContext
+
+
+
+# ########
+
+from fastapi import FastAPI, Body, Depends
+
+# from models import PostSchema, UserSchema, UserLoginSchema
+from auth_beare import JWTBearer
+from auth import signJWT
+
+# from fastapi import FastAPI, Body
+
+# from app.model import PostSchema, UserSchema, UserLoginSchema
+# from app.auth.auth_handler import signJWT
+# ########
 
 
 
@@ -82,12 +99,35 @@ async def post_book(book: SchemaBook):
         db_book = ModelBook(firstname=book.firstname, lastname=book.lastname,email=book.email, password = encrypt_pass,mobile_number=book.mobile_number,age=book.age,token=book.token)
         db.session.add(db_book)
         db.session.commit()
-       
-        return "Registered  Successfully "
+        message_for_frontend={
+        "statusCode":200,
+        "message": "Register Completed Successfully",
+        "status":"Success",
+        }       
+        return JSONResponse(content=message_for_frontend,status_code=200)
     except Exception as e:
         
         return JSONResponse(content="Email Alredy Register Please Provide A New Email ", status_code=400)
            
+
+@app.get("/auth/login/{email},{password}")
+async def login(email:str,password:str):
+
+    db_book = dbs.query(ModelBook).filter(ModelBook.email == email).first()
+    if verify_password(password,db_book.password):
+        message_for_frontend={
+        "statusCode":200,
+        "message": "Login Successfully",
+        "status":"Success",
+        "access token":signJWT(email),
+        
+        } 
+        return JSONResponse(content=message_for_frontend,status_code=200)
+    else:
+        return "error wrong vaildate password"
+
+
+
 @app.get('/fetch_data/')
 async def get_book():
     book = db.session.query(ModelBook).all()
@@ -120,15 +160,7 @@ async def delete_user(user_id:int):
     else:
         return"id not found pls provide a correct id"
     
-@app.get("/login/{email},{password}")
-async def login(email:str,password:str):
-    db_book = dbs.query(ModelBook).filter(ModelBook.email == email).first()
-    if verify_password(password,db_book.password):
-        return "login successfull welcome mr."+db_book.firstname+" "+db_book.lastname
-    else:
-        return "The password you entered is incorrect"
-    
-@app.put("/changepassword/{email},{password},{newpassword},{enter_new_password_again}")
+@app.put("/change_password/{email},{password},{newpassword},{enter_new_password_again}",dependencies=[Depends(JWTBearer())])
 async def changepassword(email:str,password:str,newpassword:str,enter_new_password_again):
     db_books = dbs.query(ModelBook).filter(ModelBook.email == email).first()
     db_book = db.session.query(ModelBook).get(db_books.id)
@@ -182,9 +214,12 @@ async def forgotpassword(email:str,token:int,newpassword:str):
             return "Entered mail id is not valid..."
     else:
         return "Entered Token is invalid..."    
-    
 
-    
+
+
+
+
+
 
 
 

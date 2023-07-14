@@ -1,4 +1,4 @@
-alembic==1.7.6.dev0
+alembic==1.7.6
 anyio==3.7.0
 apturl==0.5.2
 asgiref==3.5.0

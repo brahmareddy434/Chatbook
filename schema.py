@@ -8,13 +8,13 @@
 # create intial pydantic model / schemas
 
 
-from pydantic import BaseModel
+from pydantic import BaseModel,Field
 
 class Book(BaseModel):
     firstname: str
     lastname: str
     email :str
-    password: str
+    password: str=Field(min_length=8)
     mobile_number:str
     age : str
     token :str

@@ -1,5 +1,5 @@
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, routing,Depends
 from fastapi_sqlalchemy import DBSessionMiddleware, db
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import sessionmaker
@@ -7,9 +7,13 @@ from sqlalchemy import create_engine
 from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
 from pydantic import EmailStr,BaseModel
 from typing import List
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse,RedirectResponse,HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
 import random
 import os,sys
+import requests
+import webbrowser
+
 
 
 
@@ -59,6 +63,14 @@ dbs = SessionLocal()
 
 # to avoid csrftokenError
 app.add_middleware(DBSessionMiddleware, db_url=os.environ['DATABASE_URL'])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def verify_password(plain_password, hashed_password):
@@ -69,10 +81,27 @@ def get_password_hash(password: str):
     return pwd_context.hash(password)
 
 
-@app.get("/")
+@app.get("/s")
 async def root():
-    return {"message": "hello world"}
-
+    html_content = """
+    <html>
+    <head>
+        <title>HTML Response</title>
+    </head>
+    <body>
+        <h1>Welcome to the Softsuave .... here you can change the password</h1>
+        
+        <form action="/forgot" method="post">
+        <lable>OTP</lable><br><input type=text name="otp"><br><br>
+        <lable>Email</lable><br><input type="text" name="email"><br><br>
+        <lable>password</lable><br><input type="password" name="password"><br><br>
+        <lable>Re Enter password</lable><br><input type="password" name="re_password"><br><br>
+        <input type=submit value="Submit">
+        </form>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content, status_code=200)
 
 @app.post('/register/', response_model=SchemaBook)
 # changes in register 
@@ -122,11 +151,13 @@ async def delete_user(user_id:int):
     
 @app.get("/login/{email},{password}")
 async def login(email:str,password:str):
-    db_book = dbs.query(ModelBook).filter(ModelBook.email == email).first()
-    if verify_password(password,db_book.password):
-        return "login successfull welcome mr."+db_book.firstname+" "+db_book.lastname
-    else:
-        return "The password you entered is incorrect"
+    try:
+            db_book = dbs.query(ModelBook).filter(ModelBook.email == email).first()
+            if verify_password(password,db_book.password):
+                return "login successfull welcome mr."+db_book.firstname+" "+db_book.lastname
+    except Exception as e:
+        return JSONResponse(content="Credential's you entered is incorrect...",status_code=500)
+
     
 @app.put("/changepassword/{email},{password},{newpassword},{enter_new_password_again}")
 async def changepassword(email:str,password:str,newpassword:str,enter_new_password_again):
@@ -145,41 +176,61 @@ async def changepassword(email:str,password:str,newpassword:str,enter_new_passwo
         return "The Password you entered is incorrect"
     
 @app.post("/email")
-async def send_with_template(email: EmailSchema) -> JSONResponse:
+async def send_with_template(email: Book):
     random_number = random.randint(1000, 9999)
 
-    db_books = dbs.query(ModelBook).filter(ModelBook.email == email.dict().get("email")[0]).first()
-    db_book = db.session.query(ModelBook).get(db_books.id)
-    db_book.token=random_number
-    db.session.commit()
+    try:
+      db_books = dbs.query(ModelBook).filter(ModelBook.email == email.email).first()
+      db_book = db.session.query(ModelBook).get(db_books.id)
+      db_book.token=random_number
+      db.session.commit()    
+    except Exception as e:
+        return JSONResponse(content="Email is not Registered as a valid User ",status_code=400)
+    
     
 
     message = MessageSchema(
         subject="Fastapi-Mail module",
-        recipients=email.dict().get("email"),
-        template_body=email.dict().get("body"),
+        recipients=email.email,
+        template_body=email.email,
         body="Your otp for forget password is "+str(random_number)+ "<br> this otp will expire in 5 minutes",
         subtype=MessageType.html,
         )
 
     fm = FastMail(conf)
     await fm.send_message(message, template_name="email_template.html") 
-    return JSONResponse(status_code=200, content={"message": "email has been sent"})
+    webbrowser.open_new_tab("http://127.0.0.1:8000/s")
+    return JSONResponse(status_code=200, content={"message": "Email has been sent successfully. Another API will open in a new tab."})
 
-
-@app.put("/forgotpassword/{email},{token},{newpassword}")
-async def forgotpassword(email:str,token:int,newpassword:str):
+@app.post("/forgot")
+async def forgotpassword(request:Request):
+    form_data = await request.form()
+    email=form_data["email"]
+    otp = form_data["otp"]
+    password = form_data["password"]
+    re_password = form_data["re_password"]
     db_books = dbs.query(ModelBook).filter(ModelBook.email == email).first()
     db_book = db.session.query(ModelBook).get(db_books.id)
-    if token == int(db_book.token) and token !="string":
-        if db_book:
-                newpass=get_password_hash(newpassword)
+    if otp == db_book.token and otp !="string":
+        if password == re_password:
+            if db_book:
+                newpass=get_password_hash(password)
                 db_book.password=newpass
                 db_book.token="string"
                 db.session.commit()
+                message = MessageSchema(
+                   subject="Fastapi-Mail module",
+                   recipients=email.dict().get("email"),
+                   template_body=email.dict().get("body"),
+                   body="Your Passord changed successfully",
+                   subtype=MessageType.html,
+                )
+
+                fm = FastMail(conf)
+                await fm.send_message(message, template_name="email_template.html")
                 return "password changed successfully"
         else:
-            return "Entered mail id is not valid..."
+            return "password mismatched..."
     else:
         return "Entered Token is invalid..."    
     

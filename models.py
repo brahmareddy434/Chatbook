@@ -15,6 +15,8 @@
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+from typing_extensions import Annotated
+from fastapi import Query
 
 Base  = declarative_base()
 
@@ -36,7 +38,7 @@ class Book(Base):
     firstname = Column(String)
     lastname = Column(String)
     email = Column(String, unique=True)
-    password = Column(String)
+    password = Column(String(20))
     mobile_number= Column(String)
     age = Column(Integer)
     token = Column(String)

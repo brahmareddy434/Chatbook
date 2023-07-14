@@ -21,3 +21,7 @@ class Book(BaseModel):
 
     class Config:
         orm_mode = True
+
+class Email_input(BaseModel):
+    email:str
+    body:str | None=None

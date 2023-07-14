@@ -18,7 +18,7 @@ import webbrowser
 
 
 
-from schema import Book as SchemaBook
+from schema import Book as SchemaBook ,Email_input
 # from schema import Author as SchemaAuthor
 
 from schema import Book
@@ -175,12 +175,12 @@ async def changepassword(email:str,password:str,newpassword:str,enter_new_passwo
     else:
         return "The Password you entered is incorrect"
     
-@app.post("/email")
-async def send_with_template(email: Book):
+@app.post("/forgotpassword")
+async def send_with_template(email_input: str):
     random_number = random.randint(1000, 9999)
 
     try:
-      db_books = dbs.query(ModelBook).filter(ModelBook.email == email.email).first()
+      db_books = dbs.query(ModelBook).filter(ModelBook.email == email_input).first()
       db_book = db.session.query(ModelBook).get(db_books.id)
       db_book.token=random_number
       db.session.commit()    
@@ -188,11 +188,10 @@ async def send_with_template(email: Book):
         return JSONResponse(content="Email is not Registered as a valid User ",status_code=400)
     
     
-
+    Li=[email_input]
     message = MessageSchema(
         subject="Fastapi-Mail module",
-        recipients=email.email,
-        template_body=email.email,
+        recipients=Li,
         body="Your otp for forget password is "+str(random_number)+ "<br> this otp will expire in 5 minutes",
         subtype=MessageType.html,
         )
@@ -211,17 +210,20 @@ async def forgotpassword(request:Request):
     re_password = form_data["re_password"]
     db_books = dbs.query(ModelBook).filter(ModelBook.email == email).first()
     db_book = db.session.query(ModelBook).get(db_books.id)
-    if otp == db_book.token and otp !="string":
-        if password == re_password:
-            if db_book:
-                newpass=get_password_hash(password)
-                db_book.password=newpass
-                db_book.token="string"
-                db.session.commit()
-                message = MessageSchema(
+    try:
+        if len(password)<8:
+            return "password atleast 8 charachers"
+        if otp == db_book.token and otp !="string":
+            if password == re_password:
+                if db_book:
+                  newpass=get_password_hash(password)
+                  db_book.password=newpass
+                  db_book.token="string"
+                  db.session.commit()
+                  Li=[email]
+                  message = MessageSchema(
                    subject="Fastapi-Mail module",
-                   recipients=email.dict().get("email"),
-                   template_body=email.dict().get("body"),
+                   recipients=Li,
                    body="Your Passord changed successfully",
                    subtype=MessageType.html,
                 )
@@ -229,10 +231,12 @@ async def forgotpassword(request:Request):
                 fm = FastMail(conf)
                 await fm.send_message(message, template_name="email_template.html")
                 return "password changed successfully"
-        else:
-            return "password mismatched..."
-    else:
-        return "Entered Token is invalid..."    
+            
+            else:
+              return "password mismatched..."
+    except Exception as e:
+        return JSONResponse(content="Entered details mismatched")
+        
     
 
     

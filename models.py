@@ -36,7 +36,7 @@ class Book(Base):
     firstname = Column(String)
     lastname = Column(String)
     email = Column(String, unique=True)
-    password = Column(String)
+    password = Column(String(20))
     mobile_number= Column(String)
     age = Column(Integer)
     token = Column(String)

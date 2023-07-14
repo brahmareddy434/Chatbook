@@ -8,15 +8,16 @@
 # create intial pydantic model / schemas
 
 
-from pydantic import BaseModel
+from pydantic import BaseModel,Field
+from fastapi import Query
 
 class Book(BaseModel):
     firstname: str
     lastname: str
     email :str
-    password: str
+    password: str=Field(min_length=8)
     mobile_number:str
-    age : str
+    age : int
     token :str
 
     class Config:

@@ -14,6 +14,8 @@ from auth_beare import JWTBearer
 from auth import signJWT
 import webbrowser
 import requests
+from sqlalchemy.exc import IntegrityError
+
 
 
 
@@ -193,20 +195,32 @@ async def delete_user(user_id:int):
     
 @app.put("/change_password/{email},{password},{newpassword},{enter_new_password_again}",dependencies=[Depends(JWTBearer())])
 async def changepassword(email:str,password:str,newpassword:str,enter_new_password_again):
-    db_books = dbs.query(ModelBook).filter(ModelBook.email == email).first()
-    db_book = db.session.query(ModelBook).get(db_books.id)
-    if verify_password(password,db_book.password):
-        if newpassword==enter_new_password_again:
-            if db_book:
+    try:
+        if len(newpassword) < 8:
+            return JSONResponse(content="Password is too weak it should be more than 8 characters")
+        db_books = dbs.query(ModelBook).filter(ModelBook.email == email).first()
+        db_book = db.session.query(ModelBook).get(db_books.id)
+        if verify_password(password,db_book.password):
+            if newpassword==enter_new_password_again:
+             
+             if db_book:
+
                 newpass=get_password_hash(newpassword)
                 db_book.password=newpass
                 db.session.commit()
-               
-                return "xxx"
-        else:
-            return "New password mismatch..."
-    else:
-        return "The Password you entered is incorrect"
+                message_for_frontend={
+                "statusCode":200,
+                "message": "Password Changed Successfully",
+                "status":"Success",
+                }
+                return JSONResponse(content=message_for_frontend,status_code=200)
+    except IntegrityError as e:
+        return JSONResponse(content="Check Credentials ", status_code=400)
+    # 
+
+    except Exception as e:
+        
+        return JSONResponse(content=str(e), status_code=400)
     
 @app.post("/forgotpassword")
 async def send_with_template(email_input: str):

@@ -70,8 +70,11 @@ def get_password_hash(password: str):
 
 @app.get("/")
 async def root():
-    return "Welcome to Softsuave Technologies private limited...."
-
+    message_for_frontend = {
+        "status_code":200,
+        "msg":"Welcome to Softsuave Technologies private limited...."
+    }
+    return JSONResponse(content=message_for_frontend,status_code=status.HTTP_200_OK)
 @app.exception_handler(AuthJWTException)
 def authjwt_exception_handler(request: Request, exc: AuthJWTException):
     return JSONResponse(
@@ -98,24 +101,34 @@ async def post_book(book: SchemaBook):
         fm = FastMail(conf)
         await fm.send_message(message, template_name="email_template.html")
         message_for_frontend={
-        "statusCode":200,
         "message": "Register Completed Successfully",
-        "status":"Success",
+        "status":"success"
         }       
-        return JSONResponse(content=message_for_frontend,status_code=200)
+        return JSONResponse(content=message_for_frontend,status_code=status.HTTP_200_OK)
     except Exception as e:
-        
-        return JSONResponse(content="Email Alredy Register Please Provide A New Email ", status_code=400)
+        return JSONResponse(content={"msg":"email is already registered..","status":"Fail"}, status_code=400)
            
-
 @app.post('/login')
 async def login_page(user:LoginRequest,Authorize: AuthJWT = Depends()):
-    user_id = dbs.query(ModelBook).filter(ModelBook.email == user.email).first()
-    if not user.email == user_id.email:
-        raise HTTPException(status_code=401,detail="Incorrect email or password")
-    access_token = Authorize.create_access_token(subject=user.email,fresh=True)
-    refresh_token = Authorize.create_refresh_token(subject=user.email)
-    return {"access_token": access_token, "refresh_token": refresh_token} 
+    
+        user_id = dbs.query(ModelBook).filter(ModelBook.email == user.email).first()   
+        if user_id and verify_password(user.password,user_id.password):
+            access_token = Authorize.create_access_token(subject=user.email,fresh=True)
+            refresh_token = Authorize.create_refresh_token(subject=user.email)
+            message_for_frontend = {
+                      "msg": "login successful mr." + user_id.firstname + " " + user_id.lastname,
+                      "status":"success",
+                      "tokens": {"access_token": access_token, "refresh_token": refresh_token}
+                    }
+            return JSONResponse(content=message_for_frontend, status_code=status.HTTP_200_OK)
+        else:
+            message={
+                "msg":"entered credentials is incorrect",
+                "status":"error",
+            }
+            return JSONResponse(content=message,status_code=status.HTTP_401_UNAUTHORIZED)
+    
+    
     # return {"access_token": access_token} 
 
 

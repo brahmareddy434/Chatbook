@@ -20,13 +20,20 @@ from http.client import HTTPException
 from models import Book as ModelBook
 import os
 from dotenv import load_dotenv
-# from jwt.exceptions import InvalidSignatureError
+from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv('.env')
 
-
 app = FastAPI(debug=True)
 
+origins = ["*"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class EmailSchema(BaseModel):
     email: List[EmailStr]

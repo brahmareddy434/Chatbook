@@ -112,9 +112,12 @@ async def post_book(book: Register):
         "status":"success"
         }       
         return JSONResponse(content=message_for_frontend,status_code=status.HTTP_200_OK)
+    except IntegrityError as e:
+        return JSONResponse(content={"msg":str(e),"status":"Fail"}, status_code=400)
     except Exception as e:
-        return JSONResponse(content={"msg":"email is already registered..","status":"Fail"}, status_code=400)
-           
+        return JSONResponse(content={"msg":"email already registered ...","status":"Fail"}, status_code=400)
+
+
 @app.post('/login')
 async def login_page(user:LoginRequest,Authorize: AuthJWT = Depends()):
     

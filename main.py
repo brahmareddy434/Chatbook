@@ -14,7 +14,7 @@ from fastapi_jwt_auth.exceptions import AuthJWTException
 from schema import Book as SchemaBook
 from schema import Book
 from passlib.context import CryptContext
-from pydanticmodel import ChangePasswordRequest, LoginRequest,Forgotchangepassword
+from pydanticmodel import ChangePasswordRequest, LoginRequest,Forgotchangepassword,Register
 from fastapi import FastAPI, Body, Depends
 from http.client import HTTPException
 from models import Book as ModelBook
@@ -92,10 +92,10 @@ def authjwt_exception_handler(request: Request, exc: AuthJWTException):
 
 @app.post('/register/', response_model=SchemaBook)
 # changes in register 
-async def post_book(book: SchemaBook):
+async def post_book(book: Register):
     try:
         encrypt_pass=get_password_hash(book.password)
-        db_book = ModelBook(firstname=book.firstname, lastname=book.lastname,email=book.email, password = encrypt_pass,mobile_number=book.mobile_number,age=book.age,token=book.token)
+        db_book = ModelBook(firstname=book.firstname, lastname=book.lastname,email=book.email, password = encrypt_pass,mobile_number=book.mobile_number,age=book.age,token="string")
         db.session.add(db_book)
         db.session.commit()
         message = MessageSchema(

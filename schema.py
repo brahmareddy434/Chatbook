@@ -18,7 +18,7 @@ class Book(BaseModel):
     password: str=Field(min_length=8)
     mobile_number:str
     age : int
-    token :str
+    otp :str
 
     class Config:
         orm_mode = True

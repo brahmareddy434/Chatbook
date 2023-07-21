@@ -12,3 +12,14 @@ class Forgotchangepassword(BaseModel):
     otp : int
     new_password : str
     confirm_password : str
+
+
+
+class Register(BaseModel):
+    firstname :str
+    lastname :str
+    email :str
+    password :str
+    mobile_number:str
+    age :int
+    

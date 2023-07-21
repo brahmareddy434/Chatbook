@@ -95,7 +95,7 @@ def authjwt_exception_handler(request: Request, exc: AuthJWTException):
 async def post_book(book: Register):
     try:
         encrypt_pass=get_password_hash(book.password)
-        db_book = ModelBook(firstname=book.firstname, lastname=book.lastname,email=book.email, password = encrypt_pass,mobile_number=book.mobile_number,age=book.age,token="string")
+        db_book = ModelBook(firstname=book.firstname, lastname=book.lastname,email=book.email, password = encrypt_pass,mobile_number=book.mobile_number,age=book.age,otp="string")
         db.session.add(db_book)
         db.session.commit()
         message = MessageSchema(
@@ -113,9 +113,9 @@ async def post_book(book: Register):
         }       
         return JSONResponse(content=message_for_frontend,status_code=status.HTTP_200_OK)
     except IntegrityError as e:
-        return JSONResponse(content={"msg":str(e),"status":"Fail"}, status_code=400)
-    except Exception as e:
         return JSONResponse(content={"msg":"email already registered ...","status":"Fail"}, status_code=400)
+    except Exception as e:
+        return JSONResponse(content={"msg":str(e),"status":"Fail"}, status_code=400)
 
 
 @app.post('/login')
@@ -235,7 +235,7 @@ async def send_with_template(email_input: str):
     try:
       db_books = dbs.query(ModelBook).filter(ModelBook.email == email_input).first()
       db_book = db.session.query(ModelBook).get(db_books.id)
-      db_book.token=random_number
+      db_book.otp=random_number
       db.session.commit()    
     except Exception as e:
         message_for_frontend={
@@ -261,7 +261,7 @@ async def send_with_template(email_input: str):
 async def forgotpassword(details : Forgotchangepassword):
     try:
         if details.otp !="string":
-            dbbook=dbs.query(ModelBook).filter(ModelBook.token == str(details.otp)).first()
+            dbbook=dbs.query(ModelBook).filter(ModelBook.otp == str(details.otp)).first()
             db_book = db.session.query(ModelBook).get(dbbook.id)
     except Exception as e:
         message_For_front_end={
@@ -279,7 +279,7 @@ async def forgotpassword(details : Forgotchangepassword):
     if details.new_password == details.confirm_password:
         newpass=get_password_hash(details.new_password)
         db_book.password=newpass
-        db_book.token="string"
+        db_book.otp="string"
         db.session.commit()
         message = MessageSchema(
                    subject="Fastapi-Mail module",

@@ -111,11 +111,11 @@ async def post_book(book: Register):
         "message": "Register Completed Successfully",
         "status":"success"
         }       
-        return JSONResponse(content=message_for_frontend,status_code=status.HTTP_200_OK)
+        return JSONResponse(content=message_for_frontend, status_code=status.HTTP_200_OK)
     except IntegrityError as e:
-        return JSONResponse(content={"msg":"email already registered ...","status":"Fail"}, status_code=400)
+        return JSONResponse(content={"msg":"email already registered ...","status":"Fail"}, status_code=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        return JSONResponse(content={"msg":str(e),"status":"Fail"}, status_code=400)
+        return JSONResponse(content={"msg":str(e),"status":"Fail"}, status_code=status.HTTP_400_BAD_REQUEST)
 
 
 @app.post('/login')
@@ -198,7 +198,7 @@ def decode_access_token(user:ChangePasswordRequest,Authorize: AuthJWT = Depends(
                 "message": "Password Changed Successfully",
                 "status":"Success",
                 }
-                return JSONResponse(content=message_for_frontend,status_code=status.HTTP_200_OK)
+                return JSONResponse(content=message_for_frontend,status_code=200)
              
         else :
             return JSONResponse(content="Incorrect Password",status_code=status.HTTP_400_BAD_REQUEST) 
@@ -237,79 +237,70 @@ async def send_with_template(email_input: str):
       db_book = db.session.query(ModelBook).get(db_books.id)
       db_book.otp=random_number
       db.session.commit()    
-    except Exception as e:
-        message_for_frontend={
-            "statusCode":400,
-            "message":"unable to fetch the details of user check user name ...",
-            "status":"Fail"
-        }
-        return JSONResponse(content="Email is not Registered as a valid User ",status_code=status.HTTP_400_BAD_REQUEST)
-    
-    message = MessageSchema(
+      message = MessageSchema(
         subject="Fastapi-Mail module",
         recipients=[email_input],
         body="Your otp for forget password is "+str(random_number)+ "<br> this otp will expire in 5 minutes",
         subtype=MessageType.html,
         )
 
-    fm = FastMail(conf)
-    await fm.send_message(message, template_name="email_template.html") 
-    return JSONResponse(status_code=200, content={"status_code":status.HTTP_200_OK,"message": "Email has been sent successfully."})
-
-
-@app.post("/forgotchangepassword")
-async def forgotpassword(details : Forgotchangepassword):
-    try:
-        if details.otp !="string":
-            dbbook=dbs.query(ModelBook).filter(ModelBook.otp == str(details.otp)).first()
-            db_book = db.session.query(ModelBook).get(dbbook.id)
+      fm = FastMail(conf)
+      await fm.send_message(message, template_name="email_template.html") 
+      return JSONResponse(status_code=200, content={"status_code":status.HTTP_200_OK,"message": "Email has been sent successfully."})
     except Exception as e:
-        message_For_front_end={
-            "statuscode":400,
-            "message":"Invalid otp",
+        message_for_frontend={
+            "statusCode":400,
+            "message":"unable to fetch the details of user check user name ...",
+            "status":"Fail"
         }
-        return JSONResponse(content=message_For_front_end,status_code=status.HTTP_400_BAD_REQUEST)
+        return JSONResponse(content=message_for_frontend, status_code=status.HTTP_400_BAD_REQUEST)
     
-    if len(details.new_password) < 8:
-        message_For_Front_end={
-            "statuscode":400,
-            "message":"password not reached the requirements is should be morethan 7 characters"
+    
+@app.post("/forgotchangepassword")
+async def forgotpassword(details: Forgotchangepassword):
+    try:
+        if details.otp != "string":
+            dbbook = dbs.query(ModelBook).filter(ModelBook.otp == str(details.otp)).first()
+            db_book = db.session.query(ModelBook).get(dbbook.id)
+        else:
+            raise Exception("Invalid OTP")  # Raise an exception when OTP is "string"
+    except Exception as e:
+        message_for_frontend = {
+            "status_code": 400,
+            "message": "Invalid OTP",
         }
-        return JSONResponse(content=message_For_Front_end,status_code=status.HTTP_400_BAD_REQUEST)
+        return JSONResponse(content=message_for_frontend, status_code=status.HTTP_400_BAD_REQUEST)
+
+    if len(details.new_password) < 8:
+        message_For_Front_end = {
+            "statuscode": 400,
+            "message": "password not reached the requirements is should be more than 7 characters"
+        }
+        return JSONResponse(content=message_For_Front_end, status_code=status.HTTP_400_BAD_REQUEST)
     if details.new_password == details.confirm_password:
-        newpass=get_password_hash(details.new_password)
-        db_book.password=newpass
-        db_book.otp="string"
+        newpass = get_password_hash(details.new_password)
+        db_book.password = newpass
+        db_book.otp = "string"
         db.session.commit()
         message = MessageSchema(
-                   subject="Fastapi-Mail module",
-                   recipients=[dbbook.email],
-                   body="Your Passord changed successfully",
-                   subtype=MessageType.html,
-                  )
+            subject="Fastapi-Mail module",
+            recipients=[dbbook.email],
+            body="Your Password changed successfully",
+            subtype=MessageType.html,
+        )
         fm = FastMail(conf)
         await fm.send_message(message, template_name="email_template.html")
-        message_for_frontend={
-                        "statusCode":200,
-                        "message": "password changed Successfully",
-                        "status":"Success",}                
-        return JSONResponse(content=message_for_frontend,status_code=status.HTTP_200_OK)       
-               
-            
+        message_for_frontend = {
+            "statusCode": 200,
+            "message": "Password changed Successfully",
+            "status": "Success",
+        }
+        return JSONResponse(content=message_for_frontend, status_code=status.HTTP_200_OK)
+
     else:
-        message_for_frontend={
-                   "statusCode":400,
-                   "message": "both password is mismatch...",
-                   "status":"Fail",} 
-        return JSONResponse(content=message_for_frontend,status_code=status.HTTP_400_BAD_REQUEST)
-
-
-
-
-
-
-
-
-
-
-
+        message_for_frontend = {
+            "statusCode": 400,
+            "message": "both password is mismatch...",
+            "status": "Fail",
+        }
+        return JSONResponse(content=message_for_frontend, status_code=status.HTTP_400_BAD_REQUEST)

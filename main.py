@@ -1,4 +1,4 @@
-from fastapi import FastAPI,Request,status,HTTPException
+from fastapi import FastAPI,Request,status,HTTPException,Path,Response
 from fastapi_sqlalchemy import DBSessionMiddleware, db
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
@@ -18,9 +18,16 @@ from pydanticmodel import ChangePasswordRequest, LoginRequest,Forgotchangepasswo
 from fastapi import FastAPI, Body, Depends
 from http.client import HTTPException
 from models import Book as ModelBook
+from models import Apiactivity 
 import os
+from json import JSONDecodeError
+from datetime import datetime,timezone,timedelta
+import time
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi_sqlalchemy import db
+from sqlalchemy.exc import IntegrityError
+
 
 load_dotenv('.env')
 
@@ -34,6 +41,44 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+api_history = []
+@app.middleware("http")
+async def add_name(request: Request, call_next):
+    try:
+        present_date=datetime.now()
+        ind_time = timezone(timedelta(hours=5,minutes=30))
+        current_dateandtime=present_date.astimezone(ind_time)
+        start_time = time.time()
+        response = await call_next(request)
+        end_time = time.time()
+        process_time = end_time - start_time
+        api_activity = Apiactivity(
+            day=current_dateandtime.strftime("%Y-%m-%d"),
+            date_and_time=current_dateandtime.strftime("%H:%M:%S.%f"),
+            start_time=str(start_time),
+            end_time=str(end_time),
+            process_time=str(process_time),
+            method=request.method,
+            url=str(request.url),
+            headers=str(dict(request.headers)),
+            query_params=str(dict(request.query_params)),
+            response_status_code=str(response.status_code),
+        )
+        db.session.add(api_activity)
+        db.session.commit()
+        api_history.append(1)
+        return response
+    except JSONDecodeError:
+        return JSONResponse(
+            content={"message": "Invalid JSON data in request body"},
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    except Exception as e:
+        return JSONResponse(
+            content={"message": str(e), "status": "Fail"},
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
 
 class EmailSchema(BaseModel):
     email: List[EmailStr]
@@ -96,6 +141,15 @@ async def post_book(book: Register):
     try:
         encrypt_pass=get_password_hash(book.password)
         db_book = ModelBook(firstname=book.firstname, lastname=book.lastname,email=book.email, password = encrypt_pass,mobile_number=book.mobile_number,age=book.age,otp="string")
+        emailstr=db_book.email
+        if '@' and '.com' in emailstr:
+            pass
+        else:
+            message_for_frontend={
+        "message": "Invalid email Type",
+        "status":"Fail"
+        }
+            return JSONResponse(content=message_for_frontend ,status_code=status.HTTP_400_BAD_REQUEST)
         db.session.add(db_book)
         db.session.commit()
         message = MessageSchema(
@@ -174,7 +228,7 @@ async def login_page(user:LoginRequest,Authorize: AuthJWT = Depends()):
 #     else:
 #         return"id not found pls provide a correct id"
     
-@app.get('/change_password')
+@app.put('/change_password')
 def decode_access_token(user:ChangePasswordRequest,Authorize: AuthJWT = Depends()):
     try:
         Authorize.fresh_jwt_required()
@@ -228,8 +282,8 @@ def refresh(Authorize: AuthJWT = Depends()):
     
     return {"access_token": new_access_token,"status_code":status.HTTP_200_OK}
     
-@app.post("/forgotpassword")
-async def send_with_template(email_input: str):
+@app.put("/forgotpassword/{email_input}")
+async def send_with_template(email_input: str = Path(...)):
     random_number = random.randint(1000, 9999)
 
     try:
@@ -250,7 +304,7 @@ async def send_with_template(email_input: str):
     except Exception as e:
         message_for_frontend={
             "statusCode":400,
-            "message":"unable to fetch the details of user check user name ...",
+            "message":"Entered User id is Invalid..",
             "status":"Fail"
         }
         return JSONResponse(content=message_for_frontend, status_code=status.HTTP_400_BAD_REQUEST)
@@ -291,7 +345,7 @@ async def forgotpassword(details: Forgotchangepassword):
         fm = FastMail(conf)
         await fm.send_message(message, template_name="email_template.html")
         message_for_frontend = {
-            "statusCode": 200,
+            "status_code": 200,
             "message": "Password changed Successfully",
             "status": "Success",
         }

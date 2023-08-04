@@ -22,3 +22,17 @@ class Book(BaseModel):
 
     class Config:
         orm_mode = True
+class Apiactivity(BaseModel):
+    day:str
+    date_and_time:str
+    start_time: str
+    end_time: str
+    process_time :str
+    method: str
+    url:str
+    headers : str
+    query_params :str
+    response_status_code:str
+
+    class Config:
+        orm_mode = True

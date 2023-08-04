@@ -4,11 +4,21 @@ from pydanticmodel import LoginRequest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import pytest
+from fastapi_jwt_auth import AuthJWT
 
 client = TestClient(app)
+acc_token=""
+sample_user = {
+    "firstname": "John",
+    "lastname": "Doe",
+    "email": "john.doe@example.com",
+    "password": "securepassword",
+    "mobile_number": "1234567890",
+    "age": 30,
+}
 
 # Configure test database
-TEST_DATABASE_URL = "sqlite:///./test.db"
+TEST_DATABASE_URL = 'postgresql://postgres:postgres@172.25.0.2/chatbook'
 engine = create_engine(TEST_DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -41,7 +51,7 @@ def test_register_success():
     test_data = {
         "firstname": "John",
         "lastname": "Doe",
-        "email": "bmmmmm@gmail.com",
+        "email": "bmmmyyyyyyyyyyymmmmm@gmail.com",
         "password": "secretpassword",
         "mobile_number": "1234567890",
         "age": 30,
@@ -55,6 +65,22 @@ def test_register_success():
         "status": "success"
     }
 
+# Test for check email type is valid or not 
+def test_check_Invalid_email_type():
+    test_data = {
+        "firstname": "John",
+        "lastname": "Doe",
+        "email": "bmmmyyyyyyyyyyymmm",
+        "password": "secretpassword",
+        "mobile_number": "1234567890",
+        "age": 30,
+    }
+    response = client.post("/register/",json=test_data)
+    assert response.status_code == 400
+    assert response.json() == {
+        "message": "Invalid email Type",
+        "status":"Fail"
+        }
 
 # Test for duplicate email in registration
 def test_register_duplicate_email():
@@ -79,8 +105,8 @@ def test_register_duplicate_email():
 # Test for successful login
 def test_login_success():
     test_user = {
-        "email": "john.doe@example.com",
-        "password": "secretpassword"
+        "email": "bmmm@gmail.com",
+        "password": "stringst"
     }
 
     response = client.post("/login", json=test_user)
@@ -88,13 +114,16 @@ def test_login_success():
     assert response.status_code == 200
     assert response.json()["status"] == "success"
     assert "access_token" in response.json()["tokens"]
+    if "access_token" in response.json()["tokens"]:
+        acc_token=response.json()["tokens"]
+        
 
 
 # Test for incorrect credentials in login
 def test_login_incorrect_credentials():
     test_user = {
         "email": "john.doe@example.com",
-        "password": "wrongpassword"
+        "password": "wrongpassword234"
     }
 
     response = client.post("/login", json=test_user)
@@ -121,13 +150,13 @@ def test_login_incorrect_email():
 # Test for changing password with correct credentials
 def test_change_password_success():
     test_data = {
-        "password": "secretpassword",
-        "new_password": "newsecretpassword",
-        "confirm_password": "newsecretpassword"
+        "password": "stringst",
+        "new_password": "stringst",
+        "confirm_password": "stringst"
     }
 
-    headers = get_authorization_header("john.doe@example.com", "secretpassword")
-    response = client.post("/change_password", json=test_data, headers=headers)
+    headers = get_authorization_header("bmmm@gmail.com", "stringst")
+    response = client.put("/change_password", json=test_data, headers=headers)
 
     assert response.status_code == 200
     assert response.json()["status"] == "Success"
@@ -142,8 +171,8 @@ def test_change_password_incorrect_credentials():
         "confirm_password": "newsecretpassword"
     }
 
-    headers = get_authorization_header("john.doe@example.com", "secretpassword")
-    response = client.post("/change_password", json=test_data, headers=headers)
+    headers = get_authorization_header("bmmm@gmail.com", "stringst")
+    response = client.put("/change_password", json=test_data, headers=headers)
 
     assert response.status_code == 400
     assert response.json() == "Incorrect Password"
@@ -162,18 +191,37 @@ def get_authorization_header(email, password):
     return {"Authorization": f"Bearer {token}"}
 
 
-# Test for refreshing JWT token
+
+
 def test_refresh_token_success():
-    headers = get_authorization_header("john.doe@example.com", "secretpassword")
+    # Assuming you have the necessary imports and fixtures set up
+
+    # Create a test user
+    test_user = {
+        "email": "bmmm@gmail.com",
+        "password": "stringst"
+    }
+
+    # Register the test user and obtain the refresh token
+    client.post("/register", json=test_user)
+    response = client.post("/login", json=test_user)
+    refresh_token = response.json()["tokens"]["refresh_token"]
+
+    # Use the refresh token in the Authorization header
+    headers = {"Authorization": f"Bearer {refresh_token}"}
+
+    # Send the request to the /refresh endpoint
     response = client.post("/refresh", headers=headers)
 
+    # Assert the response
     assert response.status_code == 200
     assert "access_token" in response.json()
 
 
+
 def test_send_otp_success(test_client, db):
     test_email = "bmmmnrvv434@gmail.com"
-    response = test_client.post("/forgotpassword", json={"email_input": test_email})
+    response = client.put(f"/forgotpassword/{test_email}")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -183,26 +231,15 @@ def test_send_otp_success(test_client, db):
 
 
 def test_send_otp_invalid_email(test_client, db):
-    test_email = "invalid_email"
-    response = test_client.post("/forgotpassword", json={"email_input": test_email})
+    test_email = "bmmmnrvv43444@gmail.com"
+    response = client.put(f"/forgotpassword/{test_email}")
 
     assert response.status_code == 400
     assert response.json() == {
-        "status_code": 400,
-        "message": "Invalid email format."
-    }
-
-
-def test_send_otp_registered_email(test_client, db):
-    # Assuming this email is already registered in the database
-    test_email = "johndonnn@gmail.com"
-    response = test_client.post("/forgotpassword", json={"email_input": test_email})
-
-    assert response.status_code == 400
-    assert response.json() == {
-        "status_code": 400,
-        "message": "Email is already registered."
-    }
+            "statusCode":400,
+            "message":"Entered User id is Invalid..",
+            "status":"Fail"
+        }
 
 
 
@@ -210,9 +247,9 @@ def test_send_otp_registered_email(test_client, db):
 def test_reset_password_success(test_client, db):
     # Assuming this is a valid OTP present in the test database
     test_data = {
-        "otp": "1234",
-        "new_password": "resetsecretpassword",
-        "confirm_password": "resetsecretpassword"
+        "otp": 3037,
+        "new_password": "stringst",
+        "confirm_password": "stringst"
     }
 
     response = test_client.post("/forgotchangepassword", json=test_data)

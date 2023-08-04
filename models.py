@@ -15,6 +15,9 @@
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+from json import JSONDecodeError
+from json.decoder import JSONDecodeError
+
 
 Base  = declarative_base()
 
@@ -49,3 +52,16 @@ class Book(Base):
 # 
 # So this will help us avoiding confusion while using both.
 
+class Apiactivity(Base):
+    __tablename__ = 'tabActivity'
+    id = Column(Integer, primary_key=True)
+    day = Column(String)  # Change day to String
+    date_and_time = Column(String)  # Change date_and_time to String
+    start_time = Column(String)
+    end_time = Column(String)
+    process_time = Column(String)
+    method = Column(String)
+    url = Column(String)
+    headers = Column(String)
+    query_params = Column(String)
+    response_status_code = Column(String)

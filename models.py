@@ -55,8 +55,8 @@ class Book(Base):
 class Apiactivity(Base):
     __tablename__ = 'tabActivity'
     id = Column(Integer, primary_key=True)
-    day = Column(String)  # Change day to String
-    date_and_time = Column(String)  # Change date_and_time to String
+    date = Column(String)  
+    time = Column(String)  
     start_time = Column(String)
     end_time = Column(String)
     process_time = Column(String)

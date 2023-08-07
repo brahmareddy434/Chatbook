@@ -64,6 +64,17 @@ def test_register_success():
         "message": "Register Completed Successfully",
         "status": "success"
     }
+def test_register_unprocessable():
+    test_data = {
+        "firstname": "John",
+        "lastname": "Doe"
+    }
+
+    response = client.post("/register/", json=test_data)
+
+    assert response.status_code == 422
+    assert response.json() == {"message":"Required fields are missing","status":"Fail"}
+
 
 # Test for check email type is valid or not 
 def test_check_Invalid_email_type():
@@ -118,6 +129,14 @@ def test_login_success():
         acc_token=response.json()["tokens"]
         
 
+# login unprocessable operation
+def test_login_unprocessable():
+    test_user = {
+        "email": "john.doe@example.com",
+    }
+    response = client.post("/login", json=test_user)
+    assert response.status_code == 422
+    assert response.json()=={"message":"Required fields are missing","status":"Fail"}
 
 # Test for incorrect credentials in login
 def test_login_incorrect_credentials():

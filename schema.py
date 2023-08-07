@@ -23,8 +23,8 @@ class Book(BaseModel):
     class Config:
         orm_mode = True
 class Apiactivity(BaseModel):
-    day:str
-    date_and_time:str
+    date:str
+    time:str
     start_time: str
     end_time: str
     process_time :str

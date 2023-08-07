@@ -49,12 +49,17 @@ async def add_name(request: Request, call_next):
         ind_time = timezone(timedelta(hours=5,minutes=30))
         current_dateandtime=present_date.astimezone(ind_time)
         start_time = time.time()
+        dayy=current_dateandtime.strftime('%Y-%m-%d')
+        timee=current_dateandtime.strftime("%H:%M:%S.%f")
         response = await call_next(request)
+        if response.status_code == 422:
+            return JSONResponse(content={"message":"Required fields are missing","status":"Fail"},status_code=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        
         end_time = time.time()
         process_time = end_time - start_time
         api_activity = Apiactivity(
-            day=current_dateandtime.strftime("%Y-%m-%d"),
-            date_and_time=current_dateandtime.strftime("%H:%M:%S.%f"),
+            date=str(datetime.now())[:10],
+            time=str(datetime.now())[11:],
             start_time=str(start_time),
             end_time=str(end_time),
             process_time=str(process_time),
@@ -136,8 +141,11 @@ def authjwt_exception_handler(request: Request, exc: AuthJWTException):
 
 
 @app.post('/register/', response_model=SchemaBook)
-# changes in register 
 async def post_book(book: Register):
+    print(len(list(book)))
+    if len(list(book)) != 6:
+        message_for_frontend = {"message":"Required fields are missing...","status":"Fail"}
+        return JSONResponse(content=message_for_frontend,status_code=status.HTTP_422_UNPROCESSABLE_ENTITY)
     try:
         encrypt_pass=get_password_hash(book.password)
         db_book = ModelBook(firstname=book.firstname, lastname=book.lastname,email=book.email, password = encrypt_pass,mobile_number=book.mobile_number,age=book.age,otp="string")
@@ -166,11 +174,14 @@ async def post_book(book: Register):
         "status":"success"
         }       
         return JSONResponse(content=message_for_frontend, status_code=status.HTTP_200_OK)
-    except IntegrityError as e:
-        return JSONResponse(content={"msg":"email already registered ...","status":"Fail"}, status_code=status.HTTP_400_BAD_REQUEST)
-    except Exception as e:
-        return JSONResponse(content={"msg":str(e),"status":"Fail"}, status_code=status.HTTP_400_BAD_REQUEST)
+    except HTTPException as e:
+        if e.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY:
+            return JSONResponse(content={"msg": "Required fields are missing.", "status": "Fail"}, status_code=status.HTTP_400_BAD_REQUEST)
+        else:
+            return JSONResponse(content={"msg": e.detail, "status": "Fail"}, status_code=e.status_code)
 
+    except Exception as e:
+        return JSONResponse(content={"msg": str(e), "status": "Fail"}, status_code=status.HTTP_400_BAD_REQUEST)
 
 @app.post('/login')
 async def login_page(user:LoginRequest,Authorize: AuthJWT = Depends()):

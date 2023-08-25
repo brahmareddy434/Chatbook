@@ -1,2 +1,7 @@
 .env/
 *.env
+logfile.log
+env
+venv
+alembic.ini
+alembic/

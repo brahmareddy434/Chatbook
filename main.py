@@ -1,4 +1,4 @@
-from fastapi import FastAPI,Request,status,HTTPException,Path,Response
+from fastapi import FastAPI,Request, logger,status,HTTPException,Path,Response
 from fastapi_sqlalchemy import DBSessionMiddleware, db
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
@@ -29,9 +29,16 @@ from fastapi_sqlalchemy import db
 from sqlalchemy.exc import IntegrityError
 
 
+import logging
+logging.config.fileConfig('logging_config.ini')
+logging.basicConfig(level=logging.INFO)
 load_dotenv('.env')
 
 app = FastAPI(debug=True)
+
+logging.config.fileConfig('logging_config.ini', disable_existing_loggers=False)
+
+logger = logging.getLogger(__name__)
 
 origins = ["*"]
 app.add_middleware(
@@ -44,15 +51,31 @@ app.add_middleware(
 api_history = []
 @app.middleware("http")
 async def add_name(request: Request, call_next):
+   
+        
+       
     try:
+        logger.info(f"start request path={request.url}")
+        start_time = time.time()
+
+
+
         present_date=datetime.now()
         ind_time = timezone(timedelta(hours=5,minutes=30))
         current_dateandtime=present_date.astimezone(ind_time)
         start_time = time.time()
         dayy=current_dateandtime.strftime('%Y-%m-%d')
         timee=current_dateandtime.strftime("%H:%M:%S.%f")
+
         response = await call_next(request)
+
+        process_time = (time.time() - start_time) * 1000
+        formatted_process_time = '{0:.2f}'.format(process_time)
+        logger.info(f"completed_in={formatted_process_time} ms")
         if response.status_code == 422:
+            content={"message":"Required fields are missing"}
+            logger.error(f"{content}, status_code={status.HTTP_422_UNPROCESSABLE_ENTITY}")
+
             return JSONResponse(content={"message":"Required fields are missing","status":"Fail"},status_code=status.HTTP_422_UNPROCESSABLE_ENTITY)
         
         end_time = time.time()
@@ -72,13 +95,16 @@ async def add_name(request: Request, call_next):
         db.session.add(api_activity)
         db.session.commit()
         api_history.append(1)
+        logger.info(f"response={response},request_path={request.url}")
         return response
     except JSONDecodeError:
+        logger.error(f"msg={content},status={status.HTTP_400_BAD_REQUEST},request_path={request.url}")
         return JSONResponse(
             content={"message": "Invalid JSON data in request body"},
             status_code=status.HTTP_400_BAD_REQUEST,
         )
     except Exception as e:
+        logger.error(f"msg={content},status={status.HTTP_400_BAD_REQUEST},request_path={request.url}")
         return JSONResponse(
             content={"message": str(e), "status": "Fail"},
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -126,11 +152,12 @@ def get_password_hash(password: str):
 
 
 @app.get("/")
-async def root():
+async def root(request:Request):
     message_for_frontend = {
         "status_code":200,
         "msg":"Welcome to Softsuave Technologies private limited...."
     }
+    logger.info(f"{message_for_frontend}, status_code={status.HTTP_200_OK},request_path={request.url}")
     return JSONResponse(content=message_for_frontend,status_code=status.HTTP_200_OK)
 @app.exception_handler(AuthJWTException)
 def authjwt_exception_handler(request: Request, exc: AuthJWTException):
@@ -141,10 +168,11 @@ def authjwt_exception_handler(request: Request, exc: AuthJWTException):
 
 
 @app.post('/register/', response_model=SchemaBook)
-async def post_book(book: Register):
-    print(len(list(book)))
+async def post_book(book: Register,request: Request):
+    
     if len(list(book)) != 6:
         message_for_frontend = {"message":"Required fields are missing...","status":"Fail"}
+        logger.info(f"{message_for_frontend}, request_path={request.url},status_code={status.HTTP_422_UNPROCESSABLE_ENTITY}")
         return JSONResponse(content=message_for_frontend,status_code=status.HTTP_422_UNPROCESSABLE_ENTITY)
     try:
         encrypt_pass=get_password_hash(book.password)
@@ -157,7 +185,8 @@ async def post_book(book: Register):
         "message": "Invalid email Type",
         "status":"Fail"
         }
-            return JSONResponse(content=message_for_frontend ,status_code=status.HTTP_400_BAD_REQUEST)
+            logger.warning(f"message{message_for_frontend},request_path={request.url},status_code={status.HTTP_400_BAD_REQUEST}")
+            return JSONResponse(content=message_for_frontend ,request_path={request.url.path},status_code=status.HTTP_400_BAD_REQUEST)
         db.session.add(db_book)
         db.session.commit()
         message = MessageSchema(
@@ -172,19 +201,31 @@ async def post_book(book: Register):
         message_for_frontend={
         "message": "Register Completed Successfully",
         "status":"success"
-        }       
+        } 
+        logger.info(f"msg={message_for_frontend}, request_path={request.url},status_code={status.HTTP_200_OK}")
+    
         return JSONResponse(content=message_for_frontend, status_code=status.HTTP_200_OK)
     except HTTPException as e:
         if e.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY:
+            # logger.error(" Required fields are missing,{request.url}")
+            logger.error(f"msg={message_for_frontend}, request_path={request.url},status_code={status.HTTP_400_BAD_REQUEST}")
             return JSONResponse(content={"msg": "Required fields are missing.", "status": "Fail"}, status_code=status.HTTP_400_BAD_REQUEST)
         else:
+            logger.info(f"msg={e.detail}, request_path={request.url},status_code={status.e.status_code}")
             return JSONResponse(content={"msg": e.detail, "status": "Fail"}, status_code=e.status_code)
+    
+    except Exception as IntegrityError:
+        logger.error(f"msg= Email Already Register , status_code={status.HTTP_400_BAD_REQUEST}, request_path={request.url}")
 
+        return JSONResponse(content={"msg": str(e), "status": "Fail"}, status_code=status.HTTP_400_BAD_REQUEST)
+    
     except Exception as e:
+        logger.error(f"msg= str(e), status_code={status.HTTP_400_BAD_REQUEST}, request_path={request.url}")
+
         return JSONResponse(content={"msg": str(e), "status": "Fail"}, status_code=status.HTTP_400_BAD_REQUEST)
 
-@app.post('/login')
-async def login_page(user:LoginRequest,Authorize: AuthJWT = Depends()):
+@app.post('/login') 
+async def login_page(request:Request,user:LoginRequest,Authorize: AuthJWT = Depends()):
     
         user_id = dbs.query(ModelBook).filter(ModelBook.email == user.email).first()   
         if user_id and verify_password(user.password,user_id.password):
@@ -195,12 +236,15 @@ async def login_page(user:LoginRequest,Authorize: AuthJWT = Depends()):
                       "status":"success",
                       "tokens": {"access_token": access_token, "refresh_token": refresh_token}
                     }
+            logger.info(f"msg: login successful, status: success, status_code={status.HTTP_200_OK}, request_path={request.url}")
+
             return JSONResponse(content=message_for_frontend, status_code=status.HTTP_200_OK)
         else:
             message={
-                "msg":"entered credentials is incorrect",
+                "msg":"Entered Credentials Is Incorrect",
                 "status":"error",
             }
+            logger.error(f"msg={message},status_code={status.HTTP_401_UNAUTHORIZED},request_path={request.url}")
             return JSONResponse(content=message,status_code=status.HTTP_401_UNAUTHORIZED)
     
     
@@ -240,13 +284,14 @@ async def login_page(user:LoginRequest,Authorize: AuthJWT = Depends()):
 #         return"id not found pls provide a correct id"
     
 @app.put('/change_password')
-def decode_access_token(user:ChangePasswordRequest,Authorize: AuthJWT = Depends()):
+def decode_access_token(request:Request,user:ChangePasswordRequest,Authorize: AuthJWT = Depends()):
     try:
         Authorize.fresh_jwt_required()
         
         decoded_token = Authorize.get_raw_jwt()
         user_email = decoded_token['sub']
         if len(user.new_password) < 8:
+            logger.error(f"msg=Password is too weak it should be more than 8 characters,status_code={status.HTTP_400_BAD_REQUEST},request_path={request.url}")
             return JSONResponse(content="Password is too weak it should be more than 8 characters",status_code=status.HTTP_400_BAD_REQUEST)
         db_books = dbs.query(ModelBook).filter(ModelBook.email == user_email).first()
         db_book = db.session.query(ModelBook).get(db_books.id)
@@ -263,22 +308,33 @@ def decode_access_token(user:ChangePasswordRequest,Authorize: AuthJWT = Depends(
                 "message": "Password Changed Successfully",
                 "status":"Success",
                 }
+                logger.info(f"message={message_for_frontend},status_code={status.HTTP_200_OK},request_path={request.url}")
                 return JSONResponse(content=message_for_frontend,status_code=200)
              
         else :
+            msg={
+                "message":"Incorrect Password",
+                "status":"error",
+            }
+            logger.error(f"message={msg},status_code={status.HTTP_400_BAD_REQUEST},request_path={request.url}")
             return JSONResponse(content="Incorrect Password",status_code=status.HTTP_400_BAD_REQUEST) 
     except IntegrityError as e:
+        msg={
+                "message":"Check Credentials",
+                "status":"error",
+            }
+        logger.error(f"message={msg},request_path=%s,status_code={status.HTTP_400_BAD_REQUEST},request_path={request.url}")
         return JSONResponse(content="Check Credentials ", status_code=status.HTTP_400_BAD_REQUEST)
     
     except Exception as e:
-        
+        logger.error(f"msg={str(e.message)},status_code={status.HTTP_400_BAD_REQUEST},request_path={request.url}")
         return JSONResponse(content={'status_code':status.HTTP_400_BAD_REQUEST, 'message':e.message}, status_code=status.HTTP_400_BAD_REQUEST)
     
     # except  as e:
     #     return JSONResponse(content="Invalid Token",status_code=status.HTTP_400_BAD_REQUEST )
 
 @app.post('/refresh')
-def refresh(Authorize: AuthJWT = Depends()):
+def refresh(request:Request,Authorize: AuthJWT = Depends()):
     """
     The jwt_refresh_token_required() function insures a valid refresh
     token is present in the request before running any code below that function.
@@ -290,11 +346,15 @@ def refresh(Authorize: AuthJWT = Depends()):
 
     current_user = Authorize.get_jwt_subject()
     new_access_token = Authorize.create_access_token(subject=current_user,fresh=True)
-    
+    msg={
+                "message":"Authenticate Success",
+                "status":"Success",
+            }
+    logger.info(f"message={msg},status_code={status.HTTP_200_OK},request_path={request.url}")
     return {"access_token": new_access_token,"status_code":status.HTTP_200_OK}
     
 @app.put("/forgotpassword/{email_input}")
-async def send_with_template(email_input: str = Path(...)):
+async def send_with_template(request:Request,email_input: str = Path(...)):
     random_number = random.randint(1000, 9999)
 
     try:
@@ -311,6 +371,11 @@ async def send_with_template(email_input: str = Path(...)):
 
       fm = FastMail(conf)
       await fm.send_message(message, template_name="email_template.html") 
+      msg={
+                "message":":Email has been sent successfully",
+                "status":"Success",
+            }
+      logger.info(f"message={msg},status_code={status.HTTP_200_OK},request_path={request.url}")
       return JSONResponse(status_code=200, content={"status_code":status.HTTP_200_OK,"message": "Email has been sent successfully."})
     except Exception as e:
         message_for_frontend={
@@ -318,22 +383,25 @@ async def send_with_template(email_input: str = Path(...)):
             "message":"Entered User id is Invalid..",
             "status":"Fail"
         }
+        logger.error(f"message={message_for_frontend},status_code={status.HTTP_400_BAD_REQUEST},request_path={request.url}")
         return JSONResponse(content=message_for_frontend, status_code=status.HTTP_400_BAD_REQUEST)
     
     
 @app.post("/forgotchangepassword")
-async def forgotpassword(details: Forgotchangepassword):
+async def forgotpassword(details: Forgotchangepassword,request: Request):
     try:
         if details.otp != "string":
             dbbook = dbs.query(ModelBook).filter(ModelBook.otp == str(details.otp)).first()
             db_book = db.session.query(ModelBook).get(dbbook.id)
         else:
+            logger.error(f"message=Invalid OTP,status_code={status.HTTP_400_BAD_REQUEST},request_path={request.url}")
             raise Exception("Invalid OTP")  # Raise an exception when OTP is "string"
     except Exception as e:
         message_for_frontend = {
             "status_code": 400,
             "message": "Invalid OTP",
         }
+        logger.error(f"message={message_for_frontend},status_code={status.HTTP_400_BAD_REQUEST},request_path={request.url}")
         return JSONResponse(content=message_for_frontend, status_code=status.HTTP_400_BAD_REQUEST)
 
     if len(details.new_password) < 8:
@@ -341,6 +409,7 @@ async def forgotpassword(details: Forgotchangepassword):
             "statuscode": 400,
             "message": "password not reached the requirements is should be more than 7 characters"
         }
+        logger.error(f"message={message_for_frontend},status_code={status.HTTP_400_BAD_REQUEST},request_path={request.url}")
         return JSONResponse(content=message_For_Front_end, status_code=status.HTTP_400_BAD_REQUEST)
     if details.new_password == details.confirm_password:
         newpass = get_password_hash(details.new_password)
@@ -360,6 +429,7 @@ async def forgotpassword(details: Forgotchangepassword):
             "message": "Password changed Successfully",
             "status": "Success",
         }
+        logger.error(f"message={message_for_frontend},status_code={status.HTTP_200_OK},request_path={request.url}")
         return JSONResponse(content=message_for_frontend, status_code=status.HTTP_200_OK)
 
     else:
@@ -368,4 +438,5 @@ async def forgotpassword(details: Forgotchangepassword):
             "message": "both password is mismatch...",
             "status": "Fail",
         }
+        logger.error(f"message={message_for_frontend},status_code={status.HTTP_400_BAD_REQUEST},request_path={request.url}")
         return JSONResponse(content=message_for_frontend, status_code=status.HTTP_400_BAD_REQUEST)
